@@ -17,6 +17,12 @@ fs_in = 12000  # 输入信号采样频率（Hz）
 DEFAULT_FS_GUESS = 12000  # 默认采样频率猜测值
 TARGET_FS = 32000  # 重采样目标采样率
 
+# ---- 轴承几何（英寸） ----
+GEOM = {
+    "DE": {"Nd": 9, "d": 0.3126, "D": 1.537},  # SKF6205
+    "FE": {"Nd": 9, "d": 0.2656, "D": 1.122},  # SKF6203
+}
+
 def load_data_from_excel(file_path):
     """
     从Excel文件读取数据，动态识别列名
@@ -181,12 +187,64 @@ def calculate_correlation(signal1, signal2):
     except:
         return 0
 
+# ---- 几何频率 + 对齐指标（包络谱上） ----
+def bearing_freqs(fr_hz: float, Nd: int, d: float, D: float) -> dict:
+    rho = d / D
+    ftf  = 0.5 * (1 - rho) * fr_hz
+    bpfo = 0.5 * Nd * (1 - rho) * fr_hz
+    bpfi = 0.5 * Nd * (1 + rho) * fr_hz
+    bsf  = (1 - rho**2) / (2*rho) * fr_hz
+    return {"fr": fr_hz, "FTF": ftf, "BPFO": bpfo, "BPFI": bpfi, "BSF": bsf, "rho": rho}
+
+def band_metrics(freqs, mag, f0, delta=2.0):
+    idx = np.where((freqs >= f0 - delta) & (freqs <= f0 + delta))[0]
+    if idx.size==0: return 0.0, 0.0
+    peak = float(mag[idx].max())
+    df = float(freqs[1]-freqs[0]) if len(freqs)>1 else 1.0
+    energy = float((mag[idx]**2).sum() * df)
+    return peak, energy
+
+def harmonic_energy(freqs, mag, f0, M=5, delta=2.0):
+    e=0.0
+    for m in range(1, M+1):
+        _, ei = band_metrics(freqs, mag, m*f0, delta)
+        e += ei
+    return e
+
+def sideband_energy(freqs, mag, f0, fr, M=5, Q=3, delta=2.0):
+    e=0.0
+    for m in range(1, M+1):
+        base = m*f0
+        for q in range(1, Q+1):
+            for sign in (-1, +1):
+                _, ei = band_metrics(freqs, mag, base + sign*q*fr, delta)
+                e += ei
+    return e
+
+def freq_aligned_indicators(env_mag, freqs, fr, targets: dict,
+                            delta=2.0, M=5, Q=3, prefix=""):
+    total_energy = float((env_mag**2).sum() * (freqs[1]-freqs[0] if len(freqs)>1 else 1.0))
+    out = {}
+    for key in ["FTF","BPFO","BPFI","BSF"]:
+        f0 = targets[key]
+        pk, be = band_metrics(freqs, env_mag, f0, delta)
+        he = harmonic_energy(freqs, env_mag, f0, M, delta)
+        sb = sideband_energy(freqs, env_mag, f0, fr, M, Q, delta)
+        out[f"{prefix}{key}_peak"] = pk
+        out[f"{prefix}{key}_bandE"] = be
+        out[f"{prefix}{key}_Eratio"] = be / (total_energy + 1e-12)
+        out[f"{prefix}{key}_harmE_M{M}"] = he
+        out[f"{prefix}{key}_harmRatio_M{M}"] = he / (total_energy + 1e-12)
+        out[f"{prefix}{key}_SB_Q{Q}"] = sb
+        out[f"{prefix}{key}_SBI_Q{Q}"] = sb / (he + 1e-12)
+    return out
+
 def extract_features_from_data(de_data, fe_data, ba_data, rpm, fs=12000):
     """
     从三通道数据中提取完整特征向量
     """
     features = []
-    
+    feature_dict = {}  # 用于存储特征名称和值的字典
     # 1. 单通道时域特征
     features.extend(extract_time_domain_features(de_data))
     features.extend(extract_time_domain_features(fe_data))
@@ -225,7 +283,37 @@ def extract_features_from_data(de_data, fe_data, ba_data, rpm, fs=12000):
     
     # 添加转速信息
     features.append(rpm)
-    
+
+    # 几何频率（仅对DE和FE通道）
+    fr_hz = rpm / 60.0  # 转换为Hz
+    # 处理DE通道
+    if np.isfinite(fr_hz) and fr_hz > 0:
+        # DE通道
+        Nd = GEOM["DE"]["Nd"]; d = GEOM["DE"]["d"]; D = GEOM["DE"]["D"]
+        geom_de = bearing_freqs(fr_hz, Nd, d, D)
+        
+        # 记录几何频率值
+        
+        feature_dict["DE_FTF"] = geom_de["FTF"]
+        feature_dict["DE_BPFO"] = geom_de["BPFO"]
+        feature_dict["DE_BPFI"] = geom_de["BPFI"]
+        feature_dict["DE_BSF"] = geom_de["BSF"]
+        feature_dict["DE_rho_d_over_D"] = geom_de["rho"]
+        
+        # FE通道
+        Nd = GEOM["FE"]["Nd"]; d = GEOM["FE"]["d"]; D = GEOM["FE"]["D"]
+        geom_fe = bearing_freqs(fr_hz, Nd, d, D)
+        
+        feature_dict["FE_FTF"] = geom_fe["FTF"]
+        feature_dict["FE_BPFO"] = geom_fe["BPFO"]
+        feature_dict["FE_BPFI"] = geom_fe["BPFI"]
+        feature_dict["FE_BSF"] = geom_fe["BSF"]
+        feature_dict["FE_rho_d_over_D"] = geom_fe["rho"]
+    # 将几何频率和对齐特征添加到特征向量中
+    # 需要确保特征名称与create_feature_names函数中的顺序一致
+    geometric_features = list(feature_dict.values())
+    features.extend(geometric_features)
+
     return np.array(features)
 
 def create_feature_names():
@@ -262,8 +350,17 @@ def create_feature_names():
         feature_names.append(f"DE_FE_EnergyRatio_{node}")
         feature_names.append(f"DE_BA_EnergyRatio_{node}")
     
+
+
     # 转速特征
     feature_names.append('RPM')
+    
+    # 几何频率特征名称（新添加的）
+    geometric_features = [
+        "DE_FTF", "DE_BPFO", "DE_BPFI", "DE_BSF", "DE_rho_d_over_D",
+        "FE_FTF", "FE_BPFO", "FE_BPFI", "FE_BSF", "FE_rho_d_over_D"
+    ]
+    feature_names.extend(geometric_features)
     
     return feature_names
 
@@ -288,7 +385,31 @@ def preprocess_whole(x: np.ndarray, fs_in: int, fs_out: int) -> np.ndarray:
     up, down = fs_out//g, fs_in//g
     return signal.resample_poly(x, up=up, down=down, padtype="line")
 
-def process_single_file(file_path):
+# ---- 文件名标签解析 ----
+LABEL_RE = re.compile(
+    r"(?P<cls>OR|IR|B|N)"
+    r"(?P<size>\d{3})?"
+    r"(?:@(?P<pos>(3|6|12)))?"
+    r"(?:_(?P<load>\d))?",
+    re.IGNORECASE
+)
+
+def parse_label_from_name(path: Path) -> dict:
+    name = path.stem.upper()
+    m = LABEL_RE.search(name)
+    out = {"cls": None, "size_in": None, "load_hp": None, "or_pos": None}
+    if m:
+        cls = m.group("cls").upper()
+        out["cls"] = cls
+        size = m.group("size")
+        out["size_in"] = float(size)/1000.0 if (size and cls in {"OR","IR","B"}) else None
+        ld = m.group("load")
+        out["load_hp"] = int(ld) if ld is not None else None
+        pos = m.group("pos")
+        out["or_pos"] = int(pos) if (pos and cls=="OR") else None
+    return out
+
+def process_single_file(file_path,fs_in):
     """
     处理单个Excel文件并返回特征向量和文件标识
     """
@@ -318,15 +439,9 @@ def process_single_file(file_path):
         print(f"Error: No valid data in the Excel file: {file_path}")
         return None, None
     
-    # 巴特沃斯滤波
-    fs_in = infer_fs_from_path(Path(file_path), DEFAULT_FS_GUESS)
     de_data = preprocess_whole(de_data, fs_in, TARGET_FS)
     fe_data = preprocess_whole(fe_data, fs_in, TARGET_FS)
     ba_data = preprocess_whole(ba_data, fs_in, TARGET_FS)
-    # b, a = butter_bandpass(BP_LOW, min(BP_HIGH, 0.49*fs_in), fs=fs_in, order=FILTER_ORDER)
-    # de_data = signal.filtfilt(b, a, de_data)
-    # fe_data = signal.filtfilt(b, a, fe_data)
-    # ba_data = signal.filtfilt(b, a, ba_data)
     
     # 数据截断或填充到相同长度
     min_length = min(len(de_data), len(fe_data), len(ba_data))
@@ -372,13 +487,25 @@ if __name__ == "__main__":
     
     # 处理所有文件
     all_features = []
-    file_names = []
-    
+
+    labels = []
     for file_path in excel_files:
-        feature_vector = process_single_file(file_path)
+        fs_in = infer_fs_from_path(Path(file_path), DEFAULT_FS_GUESS) # 输入频率
+        feature_vector = process_single_file(file_path,fs_in) # 特征向量
         if feature_vector is not None:
             all_features.append(feature_vector)
-            file_names.append(os.path.basename(file_path))
+            # 当前样本的标签
+            meta = parse_label_from_name(Path(file_path))
+            label = {
+                "File Name": str(os.path.basename(file_path)),
+                "fs_inferred": fs_in,
+                "fs_target": TARGET_FS,
+                "cls": meta["cls"],
+                "size_in": meta["size_in"],
+                "load_hp": meta["load_hp"],
+                "or_pos": meta["or_pos"],
+            }
+            labels.append(label)
     
     if not all_features:
         print("No valid features extracted from any file")
@@ -386,10 +513,12 @@ if __name__ == "__main__":
     
     # 创建DataFrame
     feature_df = pd.DataFrame(all_features, columns=feature_names)
-    feature_df.insert(0, 'File_Name', file_names)  # 添加文件名列
+    # 将标签信息转换为DataFrame并合并到特征DataFrame中
+    labels_df = pd.DataFrame(labels)
+    feature_df = pd.concat([ labels_df,feature_df], axis=1)
     
-    # 保存到Excel文件
-    feature_df.to_excel(args.output_path, index=False)
+    # 保存到csv文件
+    feature_df.to_csv(args.output_path, index=False)
     
     print(f"Successfully processed {len(all_features)} files")
     print(f"Output saved to: {args.output_path}")
