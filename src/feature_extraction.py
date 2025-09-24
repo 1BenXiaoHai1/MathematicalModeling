@@ -239,6 +239,77 @@ def freq_aligned_indicators(env_mag, freqs, fr, targets: dict,
         out[f"{prefix}{key}_SBI_Q{Q}"] = sb / (he + 1e-12)
     return out
 
+def to_orders(freqs_hz: np.ndarray, fr_hz: float) -> np.ndarray:
+    """Hz 频率轴 -> 阶次轴（orders）。"""
+    fr = max(fr_hz, 1e-9)
+    return freqs_hz / fr
+
+def order_band_metrics(orders, mag, o0, delta_o=0.1):
+    """阶次窗口内峰值与能量。"""
+    idx = np.where((orders >= o0 - delta_o) & (orders <= o0 + delta_o))[0]
+    if idx.size==0: return 0.0, 0.0
+    peak = float(mag[idx].max())
+    # 阶次轴“步长”用于近似积分（这里用均匀网格近似）
+    do = float(orders[1]-orders[0] if len(orders)>1 else 1.0)
+    energy = float((mag[idx]**2).sum() * do)
+    return peak, energy
+
+def order_harmonic_energy(orders, mag, o0, M=5, delta_o=0.1):
+    e=0.0
+    for m in range(1, M+1):
+        _, ei = order_band_metrics(orders, mag, m*o0, delta_o)
+        e += ei
+    return e
+
+def order_sideband_energy(orders, mag, o0, M=5, Q=3, delta_o=0.1):
+    """
+    在阶次域，调制的旁带间距 = ± q * 1阶（即 ± q）。
+    这里以“以转频为调制”的常见情形计算旁带能量。
+    """
+    e=0.0
+    for m in range(1, M+1):
+        base = m*o0
+        for q in range(1, Q+1):
+            for sign in (-1, +1):
+                _, ei = order_band_metrics(orders, mag, base + sign*q*1.0, delta_o)
+                e += ei
+    return e
+
+def order_aligned_indicators(env_mag, freqs_hz, fr_hz, targets_hz: dict,
+                             delta_o=0.1, M=5, Q=3, prefix=""):
+    """
+    把包络谱从 Hz -> 阶次，再在阶次轴上对齐 FTF/BPFO/BPFI/BSF 计算整段指标。
+    """
+    orders = to_orders(freqs_hz, fr_hz)
+    do = float(orders[1]-orders[0] if len(orders)>1 else 1.0)
+    total_energy_o = float((env_mag**2).sum() * do)
+
+    # 目标频率（Hz）也转为目标阶次中心
+    o_targets = {k: (targets_hz[k] / max(fr_hz,1e-9)) for k in ["FTF","BPFO","BPFI","BSF"]}
+
+    out = {}
+    for key, o0 in o_targets.items():
+        pk, be = order_band_metrics(orders, env_mag, o0, delta_o)
+        he = order_harmonic_energy(orders, env_mag, o0, M, delta_o)
+        sb = order_sideband_energy(orders, env_mag, o0, M, Q, delta_o)
+        out[f"{prefix}{key}_peak_ord"] = pk
+        out[f"{prefix}{key}_bandE_ord"] = be
+        out[f"{prefix}{key}_Eratio_ord"] = be / (total_energy_o + 1e-12)
+        out[f"{prefix}{key}_harmE_M{M}_ord"] = he
+        out[f"{prefix}{key}_harmRatio_M{M}_ord"] = he / (total_energy_o + 1e-12)
+        out[f"{prefix}{key}_SB_Q{Q}_ord"] = sb
+        out[f"{prefix}{key}_SBI_Q{Q}_ord"] = sb / (he + 1e-12)
+    return out
+
+def envelope_and_spectrum(x: np.ndarray, fs: int):
+    analytic = signal.hilbert(x)
+    env = np.abs(analytic)
+    e = env - np.mean(env)
+    X = np.fft.rfft(e)
+    mag = np.abs(X)
+    freqs = np.fft.rfftfreq(len(e), d=1/fs)
+    return env, mag, freqs
+
 def extract_features_from_data(de_data, fe_data, ba_data, rpm, fs=12000):
     """
     从三通道数据中提取完整特征向量
@@ -286,20 +357,29 @@ def extract_features_from_data(de_data, fe_data, ba_data, rpm, fs=12000):
 
     # 几何频率（仅对DE和FE通道）
     fr_hz = rpm / 60.0  # 转换为Hz
+
     # 处理DE通道
     if np.isfinite(fr_hz) and fr_hz > 0:
+        # 计算包络谱 
+        _, env_mag_de, fvec = envelope_and_spectrum(de_data, TARGET_FS)
+        _, env_mag_fe, fvec = envelope_and_spectrum(fe_data, TARGET_FS)
         # DE通道
         Nd = GEOM["DE"]["Nd"]; d = GEOM["DE"]["d"]; D = GEOM["DE"]["D"]
         geom_de = bearing_freqs(fr_hz, Nd, d, D)
         
         # 记录几何频率值
-        
         feature_dict["DE_FTF"] = geom_de["FTF"]
         feature_dict["DE_BPFO"] = geom_de["BPFO"]
         feature_dict["DE_BPFI"] = geom_de["BPFI"]
         feature_dict["DE_BSF"] = geom_de["BSF"]
         feature_dict["DE_rho_d_over_D"] = geom_de["rho"]
         
+         # >>> 新增：阶次域一致性（不需要窗口，整段） <<<
+        # 固定阶次半宽 delta_o；你可按经验改 0.05~0.2
+        aligned_ord_de =  order_aligned_indicators(env_mag_de, fvec, fr_hz,
+                                                geom_de,delta_o=0.1, M=5, Q=3, prefix="DE")
+        feature_dict.update(aligned_ord_de)
+
         # FE通道
         Nd = GEOM["FE"]["Nd"]; d = GEOM["FE"]["d"]; D = GEOM["FE"]["D"]
         geom_fe = bearing_freqs(fr_hz, Nd, d, D)
@@ -309,6 +389,11 @@ def extract_features_from_data(de_data, fe_data, ba_data, rpm, fs=12000):
         feature_dict["FE_BPFI"] = geom_fe["BPFI"]
         feature_dict["FE_BSF"] = geom_fe["BSF"]
         feature_dict["FE_rho_d_over_D"] = geom_fe["rho"]
+
+        aligned_ord_fe =  order_aligned_indicators(env_mag_fe, fvec, fr_hz,
+                                        geom_fe,delta_o=0.1, M=5, Q=3, prefix="FE")
+        feature_dict.update(aligned_ord_fe)
+
     # 将几何频率和对齐特征添加到特征向量中
     # 需要确保特征名称与create_feature_names函数中的顺序一致
     geometric_features = list(feature_dict.values())
@@ -350,8 +435,6 @@ def create_feature_names():
         feature_names.append(f"DE_FE_EnergyRatio_{node}")
         feature_names.append(f"DE_BA_EnergyRatio_{node}")
     
-
-
     # 转速特征
     feature_names.append('RPM')
     
@@ -362,6 +445,28 @@ def create_feature_names():
     ]
     feature_names.extend(geometric_features)
     
+    # 阶次域对齐特征名称（新增）
+    bearing_fault_types = ["FTF", "BPFO", "BPFI", "BSF"]
+    metric_types = [
+        "peak_ord",           # 峰值
+        "bandE_ord",          # 频带能量
+        "Eratio_ord",         # 能量比
+        "harmE_M5_ord",       # 谐波能量（M=5）
+        "harmRatio_M5_ord",   # 谐波能量比
+        "SB_Q3_ord",          # 边带能量（Q=3）
+        "SBI_Q3_ord",         # 边带指数
+    ]
+    
+    # DE通道的阶次域特征
+    for fault_type in bearing_fault_types:
+        for metric in metric_types:
+            feature_names.append(f"DE_{fault_type}_{metric}")
+    
+    # FE通道的阶次域特征
+    for fault_type in bearing_fault_types:
+        for metric in metric_types:
+            feature_names.append(f"FE_{fault_type}_{metric}")
+
     return feature_names
 
 def butter_bandpass(low, high, fs, order=4):
@@ -503,7 +608,6 @@ if __name__ == "__main__":
                 "cls": meta["cls"],
                 "size_in": meta["size_in"],
                 "load_hp": meta["load_hp"],
-                "or_pos": meta["or_pos"],
             }
             labels.append(label)
     

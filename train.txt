@@ -1,0 +1,3 @@
+python .\src\feature_extraction.py --input_path .\data\源域数据集\ --output_path .\outputs\feature_out\feature.csv
+python .\src\mlp.py --data .\outputs\feature_out\feature.csv --outputs .\outputs\mlp_out\ --epochs 500  --plot
+python .\src\transfer.py --source_model .\outputs\mlp_out\mlp_model.pth --target_data .\data\目标域数据集\ --outputs .\outputs\transfer_out\

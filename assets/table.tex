@@ -1,0 +1,54 @@
+\documentclass{article}
+\usepackage{graphicx} % Required for inserting images
+
+% define cell color
+\usepackage{xcolor}
+\usepackage{colortbl}
+\usepackage{booktabs} % For improved table lines
+\definecolor{color3}{RGB}{255, 255, 200}
+\definecolor{color2}{RGB}{255, 220, 200}
+\definecolor{color1}{RGB}{255, 181, 163}
+\newcommand{\cc}[1]{\cellcolor{color#1}}
+
+\begin{document}
+\section{Table}
+
+\begin{table}[htbp]
+\centering
+\caption{Comparison of different methods.}
+\label{tab:method_comparison}
+\setlength{\extrarowheight}{2pt}
+\begin{tabular}{l| c  c}
+    \toprule
+        \textbf{Method} & \textbf{Accuracy} $\uparrow$ & \textbf{F1-Score} $\uparrow$ \\
+        \midrule
+        Random Forest & \cc{1}\textbf{0.9697} & \cc{1}\textbf{0.9758} \\
+        CNN + SVM & \cc{2}0.9690 & \cc{2}0.9444 \\
+        MLP & \cc{3}0.9394 & \cc{3}0.9243 \\
+    \bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[htbp]
+\centering
+\caption{Feature selection results with TopK strategy.}
+\label{tab:topk_results}
+\setlength{\extrarowheight}{2pt}
+\begin{tabular}{c|c|cc}
+    \toprule
+    \textbf{k\_or\_thr} & \textbf{kept\_features} & \textbf{Accuracy $\uparrow$} & \textbf{Macro-F1 $\uparrow$} \\
+    \midrule
+    top10 & 10 num + 0 cat & 0.818181818 & 0.596656611 \\
+    top20 & 20 num + 0 cat & \cc{3}0.909090909 & 0.695900178 \\
+    top30 & 30 num + 0 cat & \cc{1}0.96969697 & \cc{1}0.975757576 \\
+    top40 & 40 num + 0 cat & 0.909090909 & 0.\cc{3}692857143 \\
+    top50 & 50 num + 0 cat & \cc{2}0.939393939 & 0.\cc{2}718627451 \\
+    top60 & 60 num + 0 cat & 0.96969697 & 0.975757576 \\
+    top70 & 70 num + 0 cat & 0.96969697 & 0.975757576 \\
+    \bottomrule
+\end{tabular}
+\end{table}
+
+
+
+\end{document}
