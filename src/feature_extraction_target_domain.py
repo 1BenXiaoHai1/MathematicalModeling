@@ -21,7 +21,7 @@ FILTER_ORDER = 4
 GEOM = {
     "DE": {"Nd": 9, "d": 0.3126, "D": 1.537},  # SKF6205
     "FE": {"Nd": 9, "d": 0.2656, "D": 1.122},  # SKF6203
-}
+}    
 
 def load_target_data_from_excel(file_path):
     """

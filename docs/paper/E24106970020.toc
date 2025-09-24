@@ -1,0 +1,48 @@
+\contentsline {section}{\numberline {\bfseries 1.}问题重述}{5}{}%
+\contentsline {subsection}{\numberline {\bfseries 1.\bfseries 1}问题背景}{5}{}%
+\contentsline {subsection}{\numberline {\bfseries 1.\bfseries 2}问题提出}{5}{}%
+\contentsline {section}{\numberline {\bfseries 2.}模型假设与符号说明}{6}{}%
+\contentsline {subsection}{\numberline {\bfseries 2.\bfseries 1}模型假设}{6}{}%
+\contentsline {subsection}{\numberline {\bfseries 2.\bfseries 2}符号说明}{6}{}%
+\contentsline {section}{\numberline {\bfseries 3.}问题一的分析与求解}{7}{}%
+\contentsline {subsection}{\numberline {\bfseries 3.\bfseries 1}问题一的任务分析}{7}{}%
+\contentsline {subsubsection}{\numberline {\bfseries 3.\bfseries 1.\bfseries 1}问题一$(1)$的任务分析}{7}{}%
+\contentsline {subsubsection}{\numberline {\bfseries 3.\bfseries 1.\bfseries 2}问题一$(2)$的任务分析}{7}{}%
+\contentsline {subsection}{\numberline {\bfseries 3.\bfseries 2}基于阶次分析的域自适应数据预处理方法}{7}{}%
+\contentsline {subsection}{\numberline {\bfseries 3.\bfseries 3}源域数据的特征分析}{8}{}%
+\contentsline {subsubsection}{\numberline {\bfseries 3.\bfseries 3.\bfseries 1}时域信号分析}{8}{}%
+\contentsline {subsubsection}{\numberline {\bfseries 3.\bfseries 3.\bfseries 2}频域信号分析}{10}{}%
+\contentsline {subsection}{\numberline {\bfseries 3.\bfseries 4}源域数据的特征提取}{13}{}%
+\contentsline {subsubsection}{\numberline {\bfseries 3.\bfseries 4.\bfseries 1}时域统计}{14}{}%
+\contentsline {subsubsection}{\numberline {\bfseries 3.\bfseries 4.\bfseries 2}频域统计}{15}{}%
+\contentsline {subsubsection}{\numberline {\bfseries 3.\bfseries 4.\bfseries 3}包络域统计}{16}{}%
+\contentsline {subsubsection}{\numberline {\bfseries 3.\bfseries 4.\bfseries 4}包络域对齐指标}{16}{}%
+\contentsline {section}{\numberline {\bfseries 4.}问题二的分析与求解}{18}{}%
+\contentsline {subsection}{\numberline {\bfseries 4.\bfseries 1}问题二的任务分析}{18}{}%
+\contentsline {subsection}{\numberline {\bfseries 4.\bfseries 2}数据相关性分析}{18}{}%
+\contentsline {subsection}{\numberline {\bfseries 4.\bfseries 3}基于随机森林模型的故障分类}{18}{}%
+\contentsline {subsection}{\numberline {\bfseries 4.\bfseries 4}其他模型的故障分类}{20}{}%
+\contentsline {subsubsection}{\numberline {\bfseries 4.\bfseries 4.\bfseries 1}基于CNN+SVM混合模型分析}{20}{}%
+\contentsline {subsubsection}{\numberline {\bfseries 4.\bfseries 4.\bfseries 2}基于MLP模型分析}{20}{}%
+\contentsline {subsection}{\numberline {\bfseries 4.\bfseries 5}实验结果分析}{20}{}%
+\contentsline {section}{\numberline {\bfseries 5.}问题三的分析与求解}{22}{}%
+\contentsline {subsection}{\numberline {\bfseries 5.\bfseries 1}问题三的任务分析}{22}{}%
+\contentsline {subsection}{\numberline {\bfseries 5.\bfseries 2}迁移学习}{22}{}%
+\contentsline {subsubsection}{\numberline {\bfseries 5.\bfseries 2.\bfseries 1}特征对齐}{22}{}%
+\contentsline {subsubsection}{\numberline {\bfseries 5.\bfseries 2.\bfseries 2}源域监督与初始分类器}{22}{}%
+\contentsline {subsubsection}{\numberline {\bfseries 5.\bfseries 2.\bfseries 3}伪标签自训练}{23}{}%
+\contentsline {subsection}{\numberline {\bfseries 5.\bfseries 3}实验结果展示与分析}{23}{}%
+\contentsline {section}{\numberline {\bfseries 6.}问题四的分析与求解}{25}{}%
+\contentsline {subsection}{\numberline {\bfseries 6.\bfseries 1}问题四的任务分析}{25}{}%
+\contentsline {subsection}{\numberline {\bfseries 6.\bfseries 2}原理说明}{25}{}%
+\contentsline {subsubsection}{\numberline {\bfseries 6.\bfseries 2.\bfseries 1}事前可解释性}{25}{}%
+\contentsline {subsubsection}{\numberline {\bfseries 6.\bfseries 2.\bfseries 2}迁移过程可解释性}{25}{}%
+\contentsline {subsubsection}{\numberline {\bfseries 6.\bfseries 2.\bfseries 3}事后可解释性}{26}{}%
+\contentsline {subsection}{\numberline {\bfseries 6.\bfseries 3}实验结果分析}{26}{}%
+\contentsline {section}{\numberline {\bfseries 7.}模型评价}{29}{}%
+\contentsline {subsection}{\numberline {\bfseries 7.\bfseries 1}模型的优点}{29}{}%
+\contentsline {subsection}{\numberline {\bfseries 7.\bfseries 2}模型的缺点}{29}{}%
+\contentsline {subsection}{\numberline {\bfseries 7.\bfseries 3}模型的改进和展望}{29}{}%
+\contentsline {section}{参考文献}{30}{}%
+\contentsline {section}{\numberline {附录A}代码文件}{32}{}%
+\contentsfinish 
